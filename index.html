@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🐘 Elephant Predictions</title>
+    <style>
+        body { font-family: Arial; background:#f4f4f4; padding:20px; }
+        table { width:100%; border-collapse: collapse; margin:20px 0; }
+        th, td { border:1px solid #ccc; padding:8px; text-align:center; }
+        th { background:#4caf50; color:white; }
+        td.low { background:#ccffcc; }
+        td.medium { background:#fff0b3; }
+        td.high { background:#ffcccc; }
+        .heatmap td { transition: background 0.3s; }
+    </style>
+</head>
+<body>
+<h2>🐘 Tomorrow Predictions</h2>
+<table id="tomorrow-table">
+    <thead><tr><th>Date</th><th>Time</th><th>Weather</th><th>Probability</th></tr></thead>
+    <tbody></tbody>
+</table>
+
+<h2>🐘 Next Week Predictions</h2>
+<table id="next-week-table">
+    <thead><tr><th>Date</th><th>Time</th><th>Weather</th><th>Probability</th></tr></thead>
+    <tbody></tbody>
+</table>
+
+<h2>🐘 Next Week Heatmap</h2>
+<table id="heatmap-table" class="heatmap">
+    <thead><tr><th>Hour</th></tr></thead>
+    <tbody></tbody>
+</table>
+
+<script>
+const API_URL = "https://q6ptk6y65g.execute-api.us-west-2.amazonaws.com/prod"; // replace
+
+function getClass(prob){
+    if(prob<40) return "low";
+    else if(prob<70) return "medium";
+    else return "high";
+}
+
+async function fetchData(){
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    return JSON.parse(data.body);
+}
+
+function renderTable(id, arr){
+    const tbody = document.querySelector(`#${id} tbody`);
+    tbody.innerHTML = "";
+    arr.forEach(r=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${r.date}</td><td>${r.time}</td><td>${r.weather_forecast}</td><td class="${getClass(r.predicted_probability)}">${r.predicted_probability}%</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderHeatmap(obj){
+    const tbody = document.querySelector("#heatmap-table tbody");
+    tbody.innerHTML="";
+    const hours = [...new Set([].concat(...Object.values(obj).map(d=>Object.keys(d))))].sort();
+    const header = document.querySelector("#heatmap-table thead tr");
+    header.innerHTML="<th>Hour</th>";
+    for(const day in obj){ header.innerHTML += `<th>${day}</th>`; }
+    
+    hours.forEach(hour=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${hour}:00</td>`;
+        for(const day in obj){
+            const prob = obj[day][hour] || 0;
+            tr.innerHTML += `<td class="${getClass(prob)}">${prob}%</td>`;
+        }
+        tbody.appendChild(tr);
+    });
+}
+
+async function load(){
+    const data = await fetchData();
+    renderTable("tomorrow-table", data.tomorrow);
+    renderTable("next-week-table", data.next_week);
+    renderHeatmap(data.heatmap);
+}
+
+load();
+</script>
+</body>
+</html>
