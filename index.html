@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐘 Elephant Prediction</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    padding: 15px;
+}
+h2 { color: #333; margin-top: 25px; }
+button {
+    padding: 10px 15px;
+    margin: 5px;
+    cursor: pointer;
+    border: none;
+    background-color: #4caf50;
+    color: white;
+    border-radius: 5px;
+}
+button:hover { background-color: #45a049; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    margin-bottom: 25px;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: center;
+}
+th {
+    background-color: #4caf50;
+    color: white;
+}
+.low { background-color: #ccffcc; }
+.medium { background-color: #fff0b3; }
+.high { background-color: #ffcccc; }
+.heatmap {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    margin-top: 15px;
+    gap: 2px;
+}
+.heat-cell {
+    padding: 8px;
+    text-align: center;
+    color: white;
+    font-weight: bold;
+    border-radius: 3px;
+}
+</style>
+</head>
+<body>
+
+<h1>🐘 Elephant Awareness Predictions</h1>
+
+<div>
+    <button onclick="loadTomorrow()">Tomorrow Prediction</button>
+    <button onclick="loadNextWeek()">Next Week Prediction</button>
+</div>
+
+<h2>Tomorrow Predictions</h2>
+<table id="tomorrow-table">
+    <thead>
+        <tr><th>Date</th><th>Time</th><th>Weather</th><th>Probability</th></tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<h2>Next Week Predictions</h2>
+<table id="next-week-table">
+    <thead>
+        <tr><th>Date</th><th>Time</th><th>Weather</th><th>Probability</th></tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<h2>Next Week Heatmap</h2>
+<div class="heatmap" id="heatmap"></div>
+
+<script>
+const API_URL = "https://q6ptk6y65g.execute-api.us-west-2.amazonaws.com/prod"; // your Lambda URL
+
+function getProbClass(prob){
+    if(prob < 40) return "low";
+    if(prob < 70) return "medium";
+    return "high";
+}
+
+async function fetchData(){
+    try {
+        const res = await fetch(API_URL);
+        if(!res.ok) throw new Error("Failed to fetch API");
+        const data = await res.json(); // Already parsed JSON
+        return data;
+    } catch(err){
+        alert("Error fetching predictions: " + err.message);
+        return { tomorrow: [], next_week: [], heatmap: {} };
+    }
+}
+
+function populateTable(tableId, rows){
+    const tbody = document.querySelector(`#${tableId} tbody`);
+    tbody.innerHTML = "";
+    if(!rows || rows.length===0){
+        tbody.innerHTML = `<tr><td colspan="4">No data available</td></tr>`;
+        return;
+    }
+    rows.forEach(r=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${r.date}</td>
+            <td>${r.time}</td>
+            <td>${r.weather}</td>
+            <td class="${getProbClass(r.probability)}">${r.probability}%</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function populateHeatmap(heatmapData){
+    const container = document.getElementById("heatmap");
+    container.innerHTML = "";
+    const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    container.innerHTML += `<div class="heat-cell" style="background:#fff"></div>`; // empty top-left
+    days.forEach(d=>{
+        const div = document.createElement("div");
+        div.className="heat-cell";
+        div.style.background="#333";
+        div.textContent=d;
+        container.appendChild(div);
+    });
+    for(let hour=0; hour<24; hour++){
+        const hourDiv = document.createElement("div");
+        hourDiv.className="heat-cell";
+        hourDiv.style.background="#333";
+        hourDiv.textContent=hour+":00";
+        container.appendChild(hourDiv);
+        for(let day of days){
+            const val = heatmapData[day]?.[hour] || 0;
+            const div = document.createElement("div");
+            div.className="heat-cell";
+            const red = Math.round(val*2.55);
+            const green = 255-red;
+            div.style.background=`rgb(${red},${green},0)`;
+            div.textContent=val+"%";
+            container.appendChild(div);
+        }
+    }
+}
+
+async function loadTomorrow(){
+    const data = await fetchData();
+    populateTable("tomorrow-table", data.tomorrow);
+}
+
+async function loadNextWeek(){
+    const data = await fetchData();
+    populateTable("next-week-table", data.next_week);
+    if(data.heatmap) populateHeatmap(data.heatmap);
+}
+
+// Load tomorrow by default
+loadTomorrow();
+</script>
+
+</body>
+</html>
